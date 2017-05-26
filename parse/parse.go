@@ -78,23 +78,11 @@ func generateSpecific(filename string, in io.ReadSeeker, typeSet map[string]stri
 
 	// create opposite cased versions of replacements
 	for t, st := range typeSet {
-		if len(t) == 0 || len(st) == 0 {
-			continue
+		if _, ok := typeSet[capitalize(t)]; !ok {
+			typeSet[capitalize(t)] = uncapitalize(st)
 		}
-		lt := t
-		lt[0] = unicode.ToLower(t[0])
-		if _, ok := typeSet[lt]; !ok {
-			lst := t
-			lst[0] = unicode.ToLower(st[0])
-			typeSet[lt] = lst
-		}
-
-		ut := t
-		ut[0] = unicode.ToUpper(t[0])
-		if _, ok := typeSet[ut]; !ok {
-			ust := t
-			ust[0] = unicode.ToUpper(st[0])
-			typeSet[ut] = ust
+		if _, ok := typeSet[uncapitalize(t)]; !ok {
+			typeSet[uncapitalize(t)] = uncapitalize(st)
 		}
 	}
 
@@ -104,7 +92,7 @@ func generateSpecific(filename string, in io.ReadSeeker, typeSet map[string]stri
 	var buf bytes.Buffer
 
 	scanner := bufio.NewScanner(in)
-	replacements = make(map[string]string)
+	replacements := make(map[string]string)
 
 	for scanner.Scan() {
 
@@ -135,22 +123,20 @@ func generateSpecific(filename string, in io.ReadSeeker, typeSet map[string]stri
 				for _, p := range parts[:len(parts)-1] {
 					repParts = append(repParts, p, specificType)
 				}
-				repParts = append(parts[len(parts)-1])
+				repParts = append(repParts, parts[len(parts)-1])
 
 				if len(repParts[0]) > 0 && len(repParts) > 1 && len(repParts[1]) > 0 { // there is a prefix before the first specificType, capitalize it
-					repParts[1][0] = unicode.ToUpper(repParts[1][0])
+					repParts[1] = capitalize(repParts[1])
 				}
 				for _, p := range repParts { // capitalize the rest of the words in the replacement
-					if len(p) > 0 {
-						p[0] = unicode.ToUpper(p[0])
-					}
+					p = capitalize(p)
 				}
 
-				repWord = strings.Join(repParts, "")
-				if unicode.IsUpper(word[0]) { // Always preserve capitalization of the first letter
-					repWord[0] = unicode.ToUpper(repWord[0])
+				repWord := strings.Join(repParts, "")
+				if unicode.IsUpper([]rune(word)[0]) { // Always preserve capitalization of the first letter
+					repWord = capitalize(repWord)
 				} else {
-					repWord[0] = unicode.ToLower(repWord[0])
+					repWord = uncapitalize(repWord)
 				}
 				replacements[word] = repWord
 			}
@@ -288,4 +274,18 @@ func changePackage(r io.Reader, pkgName string) []byte {
 		fmt.Fprintln(&out, s)
 	}
 	return out.Bytes()
+}
+
+func capitalize(s string) string {
+	if len(s) == 0 {
+		return s
+	}
+	return strings.ToUpper(string(s[0])) + s[1:]
+}
+
+func uncapitalize(s string) string {
+	if len(s) == 0 {
+		return s
+	}
+	return strings.ToLower(string(s[0])) + s[1:]
 }
