@@ -76,6 +76,28 @@ func generateSpecific(filename string, in io.ReadSeeker, typeSet map[string]stri
 		}
 	}
 
+	// create opposite cased versions of replacements
+	for t, st := range typeSet {
+		if len(t) == 0 || len(st) == 0 {
+			continue
+		}
+		lt := t
+		lt[0] = unicode.ToLower(t[0])
+		if _, ok := typeSet[lt]; !ok {
+			lst := t
+			lst[0] = unicode.ToLower(st[0])
+			typeSet[lt] = lst
+		}
+
+		ut := t
+		ut[0] = unicode.ToUpper(t[0])
+		if _, ok := typeSet[ut]; !ok {
+			ust := t
+			ust[0] = unicode.ToUpper(st[0])
+			typeSet[ut] = ust
+		}
+	}
+
 	// go back to the start of the file
 	in.Seek(0, os.SEEK_SET)
 
@@ -125,6 +147,11 @@ func generateSpecific(filename string, in io.ReadSeeker, typeSet map[string]stri
 				}
 
 				repWord = strings.Join(repParts, "")
+				if unicode.IsUpper(word[0]) { // Always preserve capitalization of the first letter
+					repWord[0] = unicode.ToUpper(repWord[0])
+				} else {
+					repWord[0] = unicode.ToLower(repWord[0])
+				}
 				replacements[word] = repWord
 			}
 		}
