@@ -81,64 +81,57 @@ func generateSpecific(filename string, in io.ReadSeeker, typeSet map[string]stri
 
 	var buf bytes.Buffer
 
-	comment := ""
 	scanner := bufio.NewScanner(in)
+	replacements = make(map[string]string)
+
 	for scanner.Scan() {
 
 		l := scanner.Text()
 
 		// does this line contain generic.Type?
 		if strings.Contains(l, genericType) || strings.Contains(l, genericNumber) {
-			comment = ""
 			continue
 		}
 
 		for t, specificType := range typeSet {
-
 			// does the line contain our type
-			if strings.Contains(l, t) {
+			if !strings.Contains(l, t) {
+				continue
+			}
 
-				var newLine string
-				// check each word
-				for _, word := range strings.Fields(l) {
+			// check each word
+			for _, word := range strings.Fields(l) {
+				_, ok := replacements[word]
+				if ok { // We already have a replacement figured out for this word
+					continue
+				}
+				parts := strings.Split(word, t)
+				if len(parts) == 1 { // This word does not contain t
+					continue
+				}
+				var repParts []string
+				for _, p := range parts[:len(parts)-1] {
+					repParts = append(repParts, p, specificType)
+				}
+				repParts = append(parts[len(parts)-1])
 
-					i := 0
-					for {
-						i = strings.Index(word[i:], t) // find out where
-
-						if i > -1 {
-
-							// if this isn't an exact match
-							if i > 0 && isAlphaNumeric(rune(word[i-1])) || i < len(word)-len(t) && isAlphaNumeric(rune(word[i+len(t)])) {
-								// replace the word with a capitolized version
-								word = strings.Replace(word, t, wordify(specificType, unicode.IsUpper(rune(strings.TrimLeft(word, "*&")[0]))), 1)
-							} else {
-								// replace the word as is
-								word = strings.Replace(word, t, specificType, 1)
-							}
-
-						} else {
-							newLine = newLine + word + space
-							break
-						}
-
+				if len(repParts[0]) > 0 && len(repParts) > 1 && len(repParts[1]) > 0 { // there is a prefix before the first specificType, capitalize it
+					repParts[1][0] = unicode.ToUpper(repParts[1][0])
+				}
+				for _, p := range repParts { // capitalize the rest of the words in the replacement
+					if len(p) > 0 {
+						p[0] = unicode.ToUpper(p[0])
 					}
 				}
-				l = newLine
+
+				repWord = strings.Join(repParts, "")
+				replacements[word] = repWord
 			}
 		}
 
-		if comment != "" {
-			buf.WriteString(line(comment))
-			comment = ""
-		}
-
-		// is this line a comment?
-		// TODO: should we handle /* */ comments?
-		if strings.HasPrefix(l, "//") {
-			// record this line to print later
-			comment = l
-			continue
+		// replace everything in the line that needs to be replaced
+		for w, rw := range replacements {
+			l = strings.Replace(l, w, rw, -1)
 		}
 
 		// write the line
